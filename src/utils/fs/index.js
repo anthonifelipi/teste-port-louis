@@ -7,19 +7,19 @@ export async function readFile(path) {
     return file
       .split(os.EOL)
       .map((line) => line.trim())
-      .filter((line) => line) // Remove linhas vazias
+      .filter((line) => line) 
       .map((line) => {
         try {
           return JSON.parse(line);
         } catch (error) {
           console.error(`Error parsing JSON from line in file ${path}:`, line);
-          return null; // Ou outro valor que indique um erro de parse.
+          return null;
         }
       })
-      .filter((item) => item !== null); // Remove linhas que falharam no parse
+      .filter((item) => item !== null); 
   } catch (error) {
     console.error("Error reading the file: ", error);
-    throw error; // Lança o erro para ser tratado pelo chamador
+    throw error; 
   }
 }
 
