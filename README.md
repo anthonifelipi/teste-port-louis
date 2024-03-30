@@ -7,7 +7,7 @@
 
 ## 🚀 Techs
 
-Neste Projeto usamos as seguintes tecnologias:
+Neste Projeto usei a tecnologia:
 
 - [x] Node.js
 
