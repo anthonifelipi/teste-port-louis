@@ -1,58 +1,55 @@
-const orderKeysDefault = [
-  "número_item",
-  "código_produto",
-  "quantidade_produto",
-  "valor_unitário_produto",
-];
-const alfaNumericRegex = /^[0-9a-zA-Z]+$/;
+const numericRegex = /^[0-9a-zA-Z]+$/;
 
-function isNumber(value) {
-  return typeof value === "number";
+export function typeNumberVerify(value, numberOfDecimals) {
+  if (typeof value === "number") {
+    value = value.toString();
+  } else if (typeof value !== "string") {
+    return false;
+  }
+
+  let [integerPart, decimalPart] = value.split(",");
+
+  integerPart = Number(integerPart);
+  decimalPart = decimalPart ? Number(decimalPart) : 0;
+  if (
+    isNaN(integerPart) ||
+    isNaN(decimalPart) ||
+    integerPart < 0 ||
+    decimalPart < 0
+  ) {
+    return false;
+  }
+
+  if (decimalPart !== 0 && decimalPart.toString().length > numberOfDecimals) {
+    return false;
+  }
+
+  return true;
 }
 
-function isValidAlphanumeric(value) {
-  return alfaNumericRegex.test(value);
-}
+const validationRules = {
+  número_item: (value) => typeof value === "number",
+  código_produto: (value) => numericRegex.test(value),
+  quantidade_produto: (value) => typeof value === "number",
+  valor_unitário_produto: (value) => typeNumberVerify(value, 2),
+};
 
-function isValidFloat(value, maxDecimals) {
-  return (
-    !isNaN(parseFloat(value)) &&
-    isFinite(value) &&
-    hasMaxDecimals(value, maxDecimals)
-  );
-}
+export function ordersSchema(order, orderRow) {
+  const errors = {};
 
-function hasMaxDecimals(value, maxDecimals) {
-  return (value.toString().split(".")[1] || "").length <= maxDecimals;
-}
+  for (const key of Object.keys(order)) {
+    const validator = validationRules[key];
+    if (!validator) {
+      errors[key] = `Invalid key: ${key}`;
+      continue;
+    }
 
-export function ordersSchemaVerification(order, orderRow) {
-  let errors = { row: orderRow + 1 };
-
-  for (const key of orderKeysDefault) {
-    if (!(key in order)) {
-      errors[key] = "Missing key";
+    if (!validator(order[key])) {
+      errors[key] = `Invalid value for "${key}"`;
     }
   }
 
-  if (!isNumber(order["número_item"])) {
-    errors["número_item"] = "Must be a number";
-  }
-
-  if (!isValidAlphanumeric(order["código_produto"])) {
-    errors["código_produto"] = "Must be an alphanumeric value";
-  }
-
-  if (!isNumber(order["quantidade_produto"])) {
-    errors["quantidade_produto"] = "Must be a number";
-  }
-
-  if (!isValidFloat(order["valor_unitário_produto"], 2)) {
-    errors["valor_unitário_produto"] =
-      "Must be a maximum 2 decimals float number";
-  }
-
-  if (Object.keys(errors).length > 1) {
-    throw errors;
+  if (Object.keys(errors).length > 0) {
+    throw { row: orderRow + 1, errors };
   }
 }

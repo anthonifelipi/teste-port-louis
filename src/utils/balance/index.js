@@ -1,15 +1,30 @@
-function calculateUnitaryValue(order, number) {
-  return Number(
-    order.data
-      .find((item) => item["número_item"] === Number(number))
-      ["valor_unitário_produto"].replace(",", ".")
+function valueUnitary(order, number) {
+  const item = order.data.find(
+    (item) => item["número_item"] === Number(number)
   );
+  if (!item) {
+    console.error(
+      `Item number ${number} not found in order ${order["id_pedido"]}`
+    );
+    return 0;
+  }
+  const unitaryValue = Number(item["valor_unitário_produto"].replace(",", "."));
+
+  if (isNaN(unitaryValue)) {
+    console.error(
+      `Invalid unitary value for item number ${number} in order ${order["id_pedido"]}`
+    );
+    return 0;
+  }
+
+  return unitaryValue;
 }
 
 function balanceItems(itemsBalance, order) {
   let missingInvoiceItems = false;
   let missingItems = [];
-  let TotalValueOfMissingItems = 0;
+  let missingItemsTotal = 0;
+
   const totalValue = order.data
     .reduce((accumulator, currentItem) => {
       const currentItemValue =
@@ -27,8 +42,8 @@ function balanceItems(itemsBalance, order) {
       missingInvoiceItems = true;
       missingItems.push({ número_item: item, saldo_quantidade: balance });
 
-      const unitaryValue = calculateUnitaryValue(order, item);
-      TotalValueOfMissingItems += balance * unitaryValue;
+      const unitaryValue = valueUnitary(order, item);
+      missingItemsTotal += balance * unitaryValue;
     } else if (balance < 0) {
       throw new Error(
         `Too many invoices for item number ${item} in order ${
@@ -38,50 +53,54 @@ function balanceItems(itemsBalance, order) {
     }
   }
 
-  TotalValueOfMissingItems = TotalValueOfMissingItems.toLocaleString("pt-BR", {
+  const missingItemsStrings = missingItems.map(
+    (item) =>
+      `Número do Item: ${item.número_item}, Saldo Pendente: ${item.saldo_quantidade}`
+  );
+
+  missingItemsTotal = missingItemsTotal.toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
   });
 
   const report = {
     missingInvoiceItems,
-    missingItems,
+    missingItems: missingItemsStrings,
     tooManyItemsList: [],
     orderTotalValue: totalValue,
-    TotalValueOfMissingItems,
+    missingItemsTotal,
   };
 
   return report;
 }
 
-export function balance(order, invoicesList) {
-  const orderId = Number(order["id_pedido"]);
+export function balance(order, invoices) {
+  const id = Number(order["id_pedido"]);
+  let objectSummary = {};
 
-  const invoicesFiltered = invoicesList.filter((invoice) =>
-    invoice.data.some((item) => item["id_pedido"] === orderId)
+  const invoicesFilter = invoices.filter((invoice) =>
+    invoice.data.some((item) => Number(item["id_pedido"]) === id)
   );
-  const invoiceIds = invoicesFiltered.map((invoice) => invoice.invoice);
-
-  let itemsBalanceSummary = {};
+  const invoiceIds = invoicesFilter.map((invoice) => invoice.invoice);
 
   order.data.forEach((orderItem) => {
     const itemNumber = Number(orderItem["número_item"]);
-    const orderedQuantity = Number(orderItem["quantidade_produto"]);
+    const quantityOrders = Number(orderItem["quantidade_produto"]);
 
-    const invoicedQuantity = invoicesFiltered
+    const quantityInvoices = invoicesFilter
       .flatMap((invoice) => invoice.data)
       .filter(
         (invoiceItem) =>
-          invoiceItem["id_pedido"] === orderId &&
+          Number(invoiceItem["id_pedido"]) === id &&
           Number(invoiceItem["número_item"]) === itemNumber
       )
       .reduce((acc, cur) => acc + Number(cur["quantidade_produto"]), 0);
 
-    itemsBalanceSummary[itemNumber] = orderedQuantity - invoicedQuantity;
+    objectSummary[itemNumber] = quantityOrders - quantityInvoices;
   });
 
-  let summary = itemsBalanceReport(itemsBalanceSummary, order);
-  summary.invoices = invoiceIds;
+  let dataReturn = balanceItems(objectSummary, order);
+  dataReturn.invoices = invoiceIds;
 
-  return summary;
+  return dataReturn;
 }
